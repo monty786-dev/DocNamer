@@ -1,0 +1,16 @@
+# DocNamer Lite (Winlator / Wine, x64, CPU only).  Python 3.11 x64.
+# Ranges (not exact pins): the code was tested on newer library versions than the ones I could look up offline.
+# CI writes the exact versions it built with to  frozen-<flavor>.txt  (uploaded as a build artifact).
+numpy>=1.26,<2.1
+Pillow>=10.3
+opencv-python-headless>=4.9,<4.12
+pypdfium2>=4.30,<6
+pdfminer.six>=20231228
+python-docx>=1.1
+openpyxl>=3.1
+xlrd>=2.0.1
+onnxruntime>=1.17,<2
+rapidocr-onnxruntime>=1.3.24,<2
+pytesseract>=0.3.10
+reportlab>=4.0
+pillow-heif>=0.16

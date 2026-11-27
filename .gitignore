@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+build/*/
+dist/
+data/
+*.egg-info/
+.venv/
+frozen-*.txt
+DocNamer_output/
