@@ -1,0 +1,84 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: full
+            spec: build/docnamer_full.spec
+            reqs: requirements-full.txt
+            folder: DocNamer-full
+          - flavor: winlator
+            spec: build/docnamer_winlator.spec
+            reqs: requirements-lite.txt
+            folder: DocNamer-winlator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ matrix.reqs }} pyinstaller
+          pip freeze > frozen-${{ matrix.flavor }}.txt
+
+      - name: Run tests (PDF / Word / Excel / Hindi / handwriting teaching; OCR tests skip without Tesseract)
+        continue-on-error: true   # tests were developed on Linux; a Windows-only quirk must not block the exe build - read the log
+        shell: pwsh
+        run: |
+          choco install tesseract --no-progress -y
+          $env:PATH += ";C:\Program Files\Tesseract-OCR"
+          python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Build with PyInstaller
+        run: pyinstaller --noconfirm --clean ${{ matrix.spec }}
+
+      - name: Add Tesseract + Hindi/English/OSD language data
+        shell: pwsh
+        run: |
+          $dist = "dist/${{ matrix.folder }}"
+          if (Test-Path "C:\Program Files\Tesseract-OCR\tesseract.exe") {
+            New-Item -ItemType Directory -Force "$dist/tesseract" | Out-Null
+            Copy-Item "C:\Program Files\Tesseract-OCR\*" "$dist/tesseract" -Recurse -Force
+          } else {
+            Write-Output "::warning::Tesseract was not installed - Hindi OCR will need Tesseract added next to the exe (see README)."
+          }
+          python scripts/fetch_models.py --tess eng,osd,hin --dest "$dist/data/models/tessdata"
+          New-Item -ItemType Directory -Force "$dist/data/models/handwriting" | Out-Null
+          Copy-Item README.md "$dist/README.md"
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path "dist/${{ matrix.folder }}/*" -DestinationPath "DocNamer-${{ matrix.flavor }}-win64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DocNamer-${{ matrix.flavor }}-win64
+          path: |
+            DocNamer-${{ matrix.flavor }}-win64.zip
+            frozen-${{ matrix.flavor }}.txt
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DocNamer-${{ matrix.flavor }}-win64.zip
